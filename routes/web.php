@@ -13,6 +13,11 @@
 |
 */
 
-$router->get('/', function () use ($router) {
-    return $router->app->version();
+$router->group(['prefix' => 'auth'], function() use ($router) {
+    // Login
+    $router->post('login', 'AuthController@login');
+    // Get logged user info
+    $router->get('me', 'AuthController@me');
+    // Refresh token
+    $router->get('refresh', 'AuthController@refresh');
 });

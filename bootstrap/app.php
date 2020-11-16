@@ -73,9 +73,7 @@ $app->configure('services');
 |
 */
 
-$app->middleware([
-//     App\Http\Middleware\RefreshJWTToken::class
-]);
+// $app->middleware([]);
 
 $app->routeMiddleware([
     'auth' => App\Http\Middleware\Authenticate::class,

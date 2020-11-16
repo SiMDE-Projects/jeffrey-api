@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Middleware\RefreshJWTToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 
 class AuthController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(RefreshJWTToken::class, ['only' => 'refresh']);
         $this->middleware('auth', ['only' => 'me']);
     }
 
@@ -42,7 +41,20 @@ class AuthController extends Controller
      */
     public function refresh()
     {
-        return response(null, 200);
+        try {
+            // Try to refresh the token normally
+            $token = Auth::parseToken()->refresh();
+        } catch (TokenExpiredException $e) {
+            // If the token has expired, force the refresh
+            $token = Auth::refresh(Auth::getToken());
+        }
+
+        // Authenticate as the new user
+        Auth::setToken($token);
+        Auth::authenticate();
+
+        // Return the refreshed token
+        return $this->respondWithToken($token);
     }
 
     /**
@@ -63,9 +75,11 @@ class AuthController extends Controller
     {
         return response()->json([
             'user' => Auth::user(),
-            'token' => $token,
-            'token_type' => 'bearer',
-            'expires_in' => Auth::factory()->getTTL() * 60
+            'token' => [
+                'token' => $token,
+                'type' => 'bearer',
+                'expires_in' => Auth::factory()->getTTL() * 60
+            ]
         ], 200);
     }
 }

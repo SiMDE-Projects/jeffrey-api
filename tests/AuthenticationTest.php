@@ -1,15 +1,7 @@
 <?php
 
-use Laravel\Lumen\Testing\DatabaseMigrations;
-use Laravel\Lumen\Testing\DatabaseTransactions;
-
 class AuthenticationTest extends TestCase
 {
-    /**
-     * Tests the authentication process
-     *
-     * @return void
-     */
     public function testCasLogin()
     {
         $response = $this->json('POST', '/auth/login', [
@@ -18,7 +10,7 @@ class AuthenticationTest extends TestCase
         ]);
 
         $response->assertResponseOk();
-        $response->seeJsonContains(['token_type' => 'bearer']);
+        $response->seeJsonContains(['type' => 'bearer']);
         $this->seeInDatabase('users', ['username' => env('TEST_CAS_USER')]);;
     }
 
@@ -28,6 +20,17 @@ class AuthenticationTest extends TestCase
 
         $response = $this->actingAs($user)
             ->json('GET', '/auth/me');
+
+        $response->assertResponseOk();
+        $response->seeJson($user->toArray());
+    }
+
+    public function testRefreshToken()
+    {
+        $user = \App\Models\User::factory()->create();
+        $token = \Illuminate\Support\Facades\Auth::fromUser($user);
+
+        $response = $this->json('GET', '/auth/refresh', [], ['Authorization' => 'Bearer ' . $token]);
 
         $response->assertResponseOk();
         $response->seeJson($user->toArray());

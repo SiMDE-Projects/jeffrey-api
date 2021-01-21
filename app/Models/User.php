@@ -18,7 +18,8 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
     protected $keyType = 'string';
     public $incrementing = false;
 
-    protected $fillable = ['username', 'first_name', 'last_name', 'email'];
+    protected $fillable = ['username', 'first_name', 'last_name', 'email', 'service_ticket'];
+    protected $hidden = ['service_ticket'];
 
     public function getJWTIdentifier()
     {

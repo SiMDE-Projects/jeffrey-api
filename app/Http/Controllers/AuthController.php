@@ -23,11 +23,11 @@ class AuthController extends Controller
     {
         // Validate request
         $this->validate($request, [
-            'username' => ['required', 'string'],
-            'password' => ['required', 'string']
+            'ticket' => ['required', 'string'],
+            'service' => ['required', 'url']
         ]);
 
-        $credentials = $request->only(['username', 'password']);
+        $credentials = $request->only(['ticket', 'service']);
 
         if (! $token = Auth::attempt($credentials)) {
             return response()->json(['message' => 'Unauthorized'], 401);

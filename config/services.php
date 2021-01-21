@@ -8,6 +8,7 @@ return [
      */
     'cas' => [
         'endpoint' => env('CAS_ENDPOINT'),
-        'path' => env('CAS_PATH', '/cas')
+        'path' => env('CAS_PATH', '/cas'),
+        'service' => env('CAS_SERVICE')
     ]
 ];

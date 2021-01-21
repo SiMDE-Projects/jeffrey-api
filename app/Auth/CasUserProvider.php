@@ -5,9 +5,7 @@ namespace App\Auth;
 use App\Models\User;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Auth\Authenticatable as UserContract;
-use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 class CasUserProvider extends EloquentUserProvider
 {
@@ -21,7 +19,7 @@ class CasUserProvider extends EloquentUserProvider
     {
         // Match credentials against CAS
         try {
-            $response = Http::asForm()->post($this->getCasEndpoint() . '/v1/users', $credentials);
+            $response = Http::get($this->getCasEndpoint() . '/p3/serviceValidate', $credentials);
         } catch (\Exception $e) {
             return null;
         }
@@ -31,9 +29,67 @@ class CasUserProvider extends EloquentUserProvider
         }
 
         // Get user data
-        $model = $this->parseCASResponse($response->json());
+        $data = $this->parseCASResponse($response->body());
+
+        // If we didn't get anything from CAS
+        if(empty($data)){
+            return null;
+        }
+
         // Update the user accordingly
-        return $this->updateModel($model['id'], $model['data']);
+        return $this->updateModel($data, $credentials['ticket']);
+    }
+
+    /**
+     * Retrieves CAS endpoint from configuration
+     */
+    protected function getCasEndpoint()
+    {
+        return 'https://' . config('services.cas.endpoint') . config('services.cas.path');
+    }
+
+    /**
+     * Extract user data from a CAS response
+     * @param array $response
+     * @return array
+     */
+    protected function parseCASResponse($response)
+    {
+        // If it was, get user attributes
+        $xml = (simplexml_load_string($response))->children('cas', true);
+        if (!empty($xml->authenticationFailure)) {
+            return null;
+        }
+
+        $loginResponse = $xml->authenticationSuccess;
+
+        return [
+            'username' => (string) $loginResponse->user,
+            'first_name' => (string) $loginResponse->attributes->givenName,
+            'last_name' => (string) $loginResponse->attributes->sn,
+            'email' => (string) $loginResponse->attributes->mail,
+        ];
+    }
+
+    /**
+     * Updates a user with data pulled from CAS
+     * @param $id
+     * @param $data
+     * @return User
+     */
+    protected function updateModel($data, $ticket)
+    {
+        $data = array_merge($data, ['service_ticket' => $ticket]);
+
+        if (!$this->model::exists($data['username'])) {
+            $model = $this->model::create($data);
+        } else {
+            $model = $this->model::find($data['username']);
+            $model->update($data);
+            $model->fresh();
+        }
+
+        return $model;
     }
 
     /**
@@ -45,52 +101,6 @@ class CasUserProvider extends EloquentUserProvider
      */
     public function validateCredentials(UserContract $user, array $credentials)
     {
-        return $user->username === $credentials['username'];
-    }
-
-    /**
-     * Extract user data from a CAS response
-     * @param array $response
-     * @return array
-     */
-    protected function parseCASResponse(array $response)
-    {
-        // If it was, get user attributes
-        $attributes = $response['authentication']['principal']['attributes'];
-
-        return [
-            'id' => $attributes['uid'][0],
-            'data' => [
-                'first_name' => $attributes['givenName'][0],
-                'last_name' => $attributes['sn'][0],
-                'email' => $attributes['mail'][0],
-            ]
-        ];
-    }
-
-    /**
-     * Updates a user with data pulled from CAS
-     * @param $id
-     * @param $data
-     * @return User
-     */
-    protected function updateModel($id, $data)
-    {
-        if (!$this->model::exists($id)) {
-            $model = $this->model::create(array_merge(['username' => $id], $data));
-        } else {
-            $model = $this->model::find($id);
-            $model->update($data);
-            $model->fresh();
-        }
-        return $model;
-    }
-
-    /**
-     * Retrieves CAS endpoint from configuration
-     */
-    protected function getCasEndpoint()
-    {
-        return 'https://' . config('services.cas.endpoint') . config('services.cas.path');
+        return $user->service_ticket === $credentials['ticket'];
     }
 }
